@@ -21,11 +21,12 @@ NEW SWISS 5:
   s13_bignum    Saffron + big num   Single hero stat
 
 Usage:
-  from design_library import *
+  from design_library import re, *
   buf = s1_white(title, hero, hero_sub, hero_sent, stats, source)
 """
 
 from PIL import Image, ImageDraw, ImageFont
+import re
 import io, os
 
 W, H  = 1080, 1350
@@ -257,6 +258,7 @@ def s7_chart(title1, title2, hero, hero_sub, hero_sent, bars, callout, stats2, s
 # STYLE 8 — Swiss/Forbes Bar Chart
 # ══════════════════════════════════════════════════════════
 def s8_forbes(title, subtitle, bars, unit_label, source, bar_colors=None):
+    source = re.sub(r"^\s*Source:\s*", "", source)
     P=70; CHART_H=400; MARGIN=65
     default_colors=["#D94F3D","#E8853D","#E8C23D","#2D6A2D","#1A3A8C","#7B4FA6","#8C4A2D","#4A8C2D"]
     colors=bar_colors or default_colors
@@ -351,8 +353,8 @@ def s10_oversized(big_num, content_blocks, dot_colors=["#D93025","#2196F3","#8BC
     # Big number on one line
     draw.text((10,40),big_num,font=fit(draw,big_num,320,W-70),fill="#333333")
     # Colored dots row below number
-    dot_y=380; dot_r=55
-    for i,(dx,col) in enumerate(zip([P+30,P+170,P+310],dot_colors)):
+    dot_y=382; dot_r=45
+    for i,(dx,col) in enumerate(zip([P+30,P+160,P+290],dot_colors)):
         draw.ellipse([dx,dot_y,dx+dot_r*2,dot_y+dot_r*2],fill=col)
     draw.line([(P,480),(W-P,480)],fill="#444444",width=1)
     for i,(title,body) in enumerate(content_blocks[:2]):
