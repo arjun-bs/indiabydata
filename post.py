@@ -18,7 +18,51 @@ from zoneinfo import ZoneInfo
 def now_ist(): return datetime.now(ZoneInfo('Asia/Kolkata'))
 
 import sys; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from design_library import s1_white, s2_bold, s3_vibrant, s4_table, s5_editorial, s6_numbers, s7_chart, s8_forbes
+import design_library as _dl
+from design_library import s4_table, s7_chart, s8_forbes, GREEN, RED, BLACK, BRAND, hc
+
+# ─── SWISS LAYOUT MIX ─────────────────────────────────────
+# The same verified data is shown in the original layout (S1/S2/S3/S5/S6)
+# or its Swiss counterpart (S9/S13/S12/S11/S10). Swiss is used on alternate
+# days; override with env SWISS=1 (always) or SWISS=0 (never).
+def use_swiss():
+    m = os.environ.get("SWISS", "auto")
+    if m in ("0", "1"): return m == "1"
+    n = now_ist()
+    return (n.isocalendar()[1] + n.weekday()) % 2 == 1
+
+def s1_white(title, hero, hero_sub, hero_sent, stats, source, accent="#D4A017"):
+    if use_swiss():
+        return _dl.s9_geometric(title.upper(), hero, hero_sub, hc(hero_sent), list(stats)[:3], source)
+    return _dl.s1_white(title, hero, hero_sub, hero_sent, stats, source, accent)
+
+def s2_bold(headline, number, hero_sent, number_unit, sub, stats3, note, source):
+    if use_swiss():
+        col = {"green": GREEN, "red": RED}.get(hero_sent, BLACK)
+        return _dl.s13_bignum("#FFC107", col, str(number), headline, sub,
+                              [(l, v) for v, l in stats3][:3],
+                              [("Unit", number_unit), ("Takeaway", note)], source)
+    return _dl.s2_bold(headline, number, hero_sent, number_unit, sub, stats3, note, source)
+
+def s3_vibrant(title_top, title_bot, hero_val, hero_sent, cards3, source):
+    if use_swiss():
+        items = [("Headline stat", hero_val)] + [(l, v) for v, l in cards3]
+        return _dl.s12_grid([title_top, title_bot], str(now_ist().year), items[:4], source)
+    return _dl.s3_vibrant(title_top, title_bot, hero_val, hero_sent, cards3, source)
+
+def s5_editorial(title1, title2, hero, hero_sub, hero_sent, cards4, source):
+    if use_swiss():
+        return _dl.s11_colorblock(BRAND, title1, title2, f"{hero} - {hero_sub}",
+                                  "Data: " + source.replace("Source: ", ""), list(cards4)[:4], source)
+    return _dl.s5_editorial(title1, title2, hero, hero_sub, hero_sent, cards4, source)
+
+def s6_numbers(title1, title2, year, hero_num, hero_unit, hero_label, hero_sent, items3, source, accent=GREEN):
+    if use_swiss():
+        n, u, l = items3[0]
+        blocks = [(title2.title(), f"{hero_num} {hero_unit} - {hero_label}".replace("  ", " ")),
+                  (f"{n} {u}".strip(), l)]
+        return _dl.s10_oversized(hero_num, blocks, [hc(hero_sent), "#2196F3", "#8BC34A"], source)
+    return _dl.s6_numbers(title1, title2, year, hero_num, hero_unit, hero_label, hero_sent, items3, source, accent)
 
 import os, sys
 def _need(name):

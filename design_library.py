@@ -331,11 +331,11 @@ def s9_geometric(stat_label, hero_val, stat_sub, color=BRAND, stats3=[], source=
         for i,(v,l) in enumerate(stats3):
             x=P+i*cw
             if i>0: draw.line([(x,680),(x,780)],fill="#BBAA99",width=1)
-            draw.text((x+(15 if i>0 else 0),686),l.upper(),font=get_font(20,bold=False),fill="#888888")
-            draw.text((x+(15 if i>0 else 0),715),v,font=get_font(50),fill=BLACK)
-    draw.text((P,810),stat_label,font=get_font(26,bold=False),fill="#999999")
-    draw.text((P,845),stat_sub,font=get_font(26,bold=False),fill="#999999")
-    draw.text((P-10,940),hero_val,font=get_font(280),fill=color)
+            draw.text((x+(15 if i>0 else 0),686),l.upper(),font=fit(draw,l.upper(),20,cw-30,False),fill="#888888")
+            draw.text((x+(15 if i>0 else 0),715),v,font=fit(draw,v,50,cw-30),fill=BLACK)
+    draw.text((P,810),stat_label,font=fit(draw,stat_label,26,W-2*P,False),fill="#999999")
+    draw.text((P,845),stat_sub,font=fit(draw,stat_sub,26,W-2*P,False),fill="#999999")
+    draw.text((P-10,940),hero_val,font=fit(draw,hero_val,280,W-2*P+10),fill=color)
     logo(draw,P,H-88)
     draw.text((P,H-38),source,font=get_font(18,bold=False),fill="#AAAAAA")
     return save_buf(img)
@@ -349,14 +349,14 @@ def s10_oversized(big_num, content_blocks, dot_colors=["#D93025","#2196F3","#8BC
     for y in range(0,H,H//4): draw.line([(0,y),(W,y)],fill="#2E2E2E",width=1)
     draw.line([(W//2,0),(W//2,H)],fill="#2E2E2E",width=1)
     # Big number on one line
-    draw.text((-20,40),big_num,font=get_font(320),fill="#333333")
+    draw.text((10,40),big_num,font=fit(draw,big_num,320,W-70),fill="#333333")
     # Colored dots row below number
     dot_y=380; dot_r=55
     for i,(dx,col) in enumerate(zip([P+30,P+170,P+310],dot_colors)):
         draw.ellipse([dx,dot_y,dx+dot_r*2,dot_y+dot_r*2],fill=col)
     draw.line([(P,480),(W-P,480)],fill="#444444",width=1)
     for i,(title,body) in enumerate(content_blocks[:2]):
-        cy=520+i*320; draw.text((P,cy),title,font=get_font(52),fill="#FFFFFF")
+        cy=520+i*320; draw.text((P,cy),title,font=fit(draw,title,52,W-2*P),fill="#FFFFFF")
         for j,line in enumerate(wrap(draw,body,get_font(28,bold=False),W-P*2)):
             draw.text((P,cy+68+j*38),line,font=get_font(28,bold=False),fill="#AAAAAA")
     draw.line([(P,H-140),(W-P,H-140)],fill="#444444",width=1)
@@ -371,8 +371,8 @@ def s11_colorblock(block_color, line1, line2, body_l, body_r, stats4=[], source=
     P=80
     img=Image.new("RGB",(W,H),"#EFEFEF"); draw=ImageDraw.Draw(img)
     draw.rectangle([0,0,W,560],fill=block_color)
-    draw.text((P,70),line1,font=get_font(120),fill=BLACK)
-    draw.text((P,200),line2,font=get_font(120),fill=BLACK)
+    draw.text((P,70),line1,font=fit(draw,line1,120,W-2*P),fill=BLACK)
+    draw.text((P,200),line2,font=fit(draw,line2,120,W-2*P),fill=BLACK)
     logo(draw,P,470)
     cw=(W-P*2-40)//2
     draw.text((P,620),"INDIA BY DATA",font=get_font(20,bold=False),fill="#999999")
@@ -385,7 +385,7 @@ def s11_colorblock(block_color, line1, line2, body_l, body_r, stats4=[], source=
         draw.line([(P,1140),(W-P,1140)],fill="#CCCCCC",width=1)
         sw=(W-P*2)//len(stats4)
         for i,(v,l) in enumerate(stats4):
-            x=P+i*sw; draw.text((x,1158),v,font=get_font(52),fill=block_color); draw.text((x,1220),l,font=get_font(20,bold=False),fill="#999999")
+            x=P+i*sw; draw.text((x,1158),v,font=fit(draw,v,52,sw-16),fill=block_color); draw.text((x,1220),l,font=fit(draw,l,20,sw-16,False),fill="#999999")
     draw.text((P,H-60),source,font=get_font(18,bold=False),fill=LGRAY)
     return save_buf(img)
 
@@ -396,17 +396,17 @@ def s12_grid(stacked_words, tag, grid_items, source=""):
     P=70; SAFFRON="#FFC107"
     img=Image.new("RGB",(W,H),SAFFRON); draw=ImageDraw.Draw(img)
     draw.text((W-P-200,P),tag,font=get_font(24),fill=BLACK)
-    ty=80
+    ty=115
     for w in stacked_words:
-        draw.text((P,ty),w,font=get_font(130),fill=BLACK); ty+=138
+        draw.text((P,ty),w,font=fit(draw,w,130,W-2*P),fill=BLACK); ty+=138
     draw.line([(P,ty+10),(W-P,ty+10)],fill="#333333",width=2); ty+=40
     draw.text((P,ty),"IndiaByData  •  Data Journalism",font=get_font(22,bold=False),fill="#555555"); ty+=44
     draw.line([(P,ty),(W-P,ty)],fill="#33333355",width=1); ty+=30
     cw=(W-P*2-40)//2
     for i,(label,value) in enumerate(grid_items):
         x=P if i%2==0 else P+cw+40; row_y=ty+(i//2)*148
-        draw.text((x,row_y),label,font=get_font(22,bold=False),fill="#333333")
-        draw.text((x,row_y+32),value,font=get_font(42),fill=BLACK)
+        draw.text((x,row_y),label,font=fit(draw,label,22,cw-10,False),fill="#333333")
+        draw.text((x,row_y+32),value,font=fit(draw,value,42,cw-10),fill=BLACK)
         draw.line([(x,row_y+92),(x+cw-10,row_y+92)],fill="#33333333",width=1)
     logo(draw,P,H-90); draw.text((P+240,H-75),source,font=get_font(18,bold=False),fill="#555555")
     return save_buf(img)
@@ -419,18 +419,18 @@ def s13_bignum(bg, num_color, big_num, title_r, sub_r, grid_l, grid_r, source=""
     img=Image.new("RGB",(W,H),bg); draw=ImageDraw.Draw(img)
     # Logo top left — fixed position, no overlap
     logo(draw,P,P)
-    for j,line in enumerate(wrap(draw,title_r,get_font(48),W//2-P)):
+    for j,line in enumerate(wrap(draw,title_r,get_font(48),W//2-2*P)):
         draw.text((W//2+P,P+j*58),line,font=get_font(48),fill=BLACK)
     draw.line([(P,185),(W-P,185)],fill="#33333333",width=1)
     draw.line([(W//2,P),(W//2,185)],fill="#33333333",width=1)
-    draw.text((P,200),sub_r,font=get_font(24,bold=False),fill="#55555588")
+    draw.text((P,200),sub_r,font=fit(draw,sub_r,24,W-2*P,False),fill="#555555")
     # Massive number
-    draw.text((P-15,270),big_num,font=get_font(520),fill=num_color)
+    draw.text((P-15,270),big_num,font=fit(draw,big_num,520,W-2*P+15),fill=num_color)
     draw.line([(P,990),(W-P,990)],fill="#33333355",width=2)
     for i,(l,v) in enumerate(grid_l):
-        y=1010+i*100; draw.text((P,y),l,font=get_font(20,bold=False),fill="#555555"); draw.text((P,y+26),v,font=get_font(40),fill=BLACK)
+        y=1010+i*100; draw.text((P,y),l,font=get_font(20,bold=False),fill="#555555"); draw.text((P,y+26),v,font=fit(draw,v,40,W//2-P-20),fill=BLACK)
     for i,(l,v) in enumerate(grid_r):
-        y=1010+i*100; draw.text((W//2+P,y),l,font=get_font(20,bold=False),fill="#555555"); draw.text((W//2+P,y+26),v,font=get_font(40),fill=BLACK)
+        y=1010+i*100; draw.text((W//2+P,y),l,font=get_font(20,bold=False),fill="#555555"); draw.text((W//2+P,y+26),v,font=fit(draw,v,40,W//2-2*P),fill=BLACK)
     draw.line([(P,H-70),(W-P,H-70)],fill="#33333322",width=1)
     draw.text((P,H-52),source,font=get_font(18,bold=False),fill="#55555588")
     return save_buf(img)
