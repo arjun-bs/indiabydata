@@ -164,7 +164,7 @@ def s4_table(name, known, info):
     draw.line([(P,400),(W-P,400)],fill="#EEEEEE",width=2)
     c1=P; c2=P+380; c3=P+680
     for x,c in zip([c1,c2,c3],["METRIC","VALUE","INSIGHT"]):
-        draw.rectangle([x,410,x+360,452],fill="#F5F5F5"); draw.text((x+10,422),c,font=get_font(20,bold=False),fill="#999999")
+        draw.rectangle([x,410,min(x+360,W-P),452],fill="#F5F5F5"); draw.text((x+10,422),c,font=get_font(20,bold=False),fill="#999999")
     gdp_pc=round(info['gdp']*1e12/(info['pop']*1e6)/1000)
     rows=[("State GDP",f"Rs. {info['gdp']}T","Top 5 in India"),("Population",f"{info['pop']}M","Census data"),
           ("Literacy Rate",f"{info['lit']}%","Natl avg 77.7%"),("GDP Per Capita",f"Rs. {gdp_pc}K","Annual"),("Capital City",info["capital"],"Admin HQ")]
@@ -430,9 +430,9 @@ def s13_bignum(bg, num_color, big_num, title_r, sub_r, grid_l, grid_r, source=""
     draw.text((P-15,270),big_num,font=fit(draw,big_num,520,W-2*P+15),fill=num_color)
     draw.line([(P,990),(W-P,990)],fill="#33333355",width=2)
     for i,(l,v) in enumerate(grid_l):
-        y=1010+i*100; draw.text((P,y),l,font=get_font(20,bold=False),fill="#555555"); draw.text((P,y+26),v,font=fit(draw,v,40,W//2-P-20),fill=BLACK)
+        y=1002+i*88; draw.text((P,y),l,font=get_font(20,bold=False),fill="#555555"); draw.text((P,y+26),v,font=fit(draw,v,40,W//2-P-20),fill=BLACK)
     for i,(l,v) in enumerate(grid_r):
-        y=1010+i*100; draw.text((W//2+P,y),l,font=get_font(20,bold=False),fill="#555555"); draw.text((W//2+P,y+26),v,font=fit(draw,v,40,W//2-2*P),fill=BLACK)
+        y=1002+i*88; draw.text((W//2+P,y),l,font=get_font(20,bold=False),fill="#555555"); draw.text((W//2+P,y+26),v,font=fit(draw,v,40,W//2-2*P),fill=BLACK)
     draw.line([(P,H-70),(W-P,H-70)],fill="#33333322",width=1)
     draw.text((P,H-52),source,font=get_font(18,bold=False),fill="#55555588")
     return save_buf(img)

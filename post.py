@@ -19,7 +19,17 @@ def now_ist(): return datetime.now(ZoneInfo('Asia/Kolkata'))
 
 import sys; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import design_library as _dl
-from design_library import s4_table, s7_chart, GREEN, RED, BLACK, BRAND, hc
+from design_library import s7_chart, GREEN, RED, BLACK, BRAND, hc
+
+def s4_table(name, known, info):
+    if use_swiss():
+        gdp_pc = round(info['gdp'] * 1e12 / (info['pop'] * 1e6) / 1000)
+        items = [("State GDP (top 5 in India)", f"Rs. {info['gdp']}T"), ("Population", f"{info['pop']}M"),
+                 ("Literacy (India avg 77.7%)", f"{info['lit']}%"), ("GDP per capita", f"Rs. {gdp_pc}K"),
+                 ("Capital", info["capital"]), ("Known for", known),
+                 ("Share of India GDP", f"{round(info['gdp']/160*100, 1)}%")]
+        return _dl.s12_grid(["STATE", name.upper()], "SPOTLIGHT", items, "Source: Census, State Economic Survey")
+    return _dl.s4_table(name, known, info)
 
 # Ranking charts must be in descending order (comparison charts keep India first on purpose)
 SORTED_CHARTS = ("India's Most Populated States", "India's Urbanisation by State")
@@ -32,11 +42,14 @@ def s8_forbes(title, subtitle, bars, unit_label, source, bar_colors=None):
 # The same verified data is shown in the original layout (S1/S2/S3/S5/S6)
 # or its Swiss counterpart (S9/S13/S12/S11/S10). Swiss is used on alternate
 # days; override with env SWISS=1 (always) or SWISS=0 (never).
+_SLOT_IDX = {"8AM": 0, "1PM": 1, "6PM": 2, "9PM": 3}
+CURRENT_SLOT = 0
+
 def use_swiss():
+    """Posts alternate classic/Swiss through the day (8AM, 1PM, 6PM, 9PM); the pattern flips every day."""
     m = os.environ.get("SWISS", "auto")
     if m in ("0", "1"): return m == "1"
-    n = now_ist()
-    return (n.isocalendar()[1] + n.weekday()) % 2 == 1
+    return (CURRENT_SLOT + now_ist().toordinal()) % 2 == 1
 
 def s1_white(title, hero, hero_sub, hero_sent, stats, source, accent="#D4A017"):
     if use_swiss():
@@ -287,7 +300,9 @@ def get_post(slot_dict, label):
     key = (wk, day)
     if key not in slot_dict:
         key = (0, day % 7)
-    print(f"  {label} | Week {wk} | Day {day}")
+    global CURRENT_SLOT
+    CURRENT_SLOT = _SLOT_IDX.get(label[:3], 0)
+    print(f"  {label} | Week {wk} | Day {day} | theme: {'Swiss' if use_swiss() else 'classic'}")
     return slot_dict[key]()
 
 # ─── INSTAGRAM ────────────────────────────────────────────
@@ -296,28 +311,100 @@ def get_user_id():
     if "error" in d: print("  Error:",d["error"]["message"]); return None
     print(f"  Connected: @{d.get('username')}"); return d.get("id")
 
-def upload_image(buf):
-    b64=base64.b64encode(buf.read()).decode("utf-8")
-    res=requests.post("https://api.imgbb.com/1/upload",data={"key":IMGBB_API_KEY,"image":b64},timeout=30).json()
-    if res.get("success"):
-        url = res["data"].get("image",{}).get("url") or res["data"].get("display_url") or res["data"].get("url")
-        print("  Uploaded:",url); return url
-    print("  Failed:",res); return None
+def upload_image(buf, tries=3):
+    raw = buf.read()
+    b64 = base64.b64encode(raw).decode("utf-8")
+    for attempt in range(1, tries + 1):
+        try:
+            res = requests.post("https://api.imgbb.com/1/upload", data={"key": IMGBB_API_KEY, "image": b64}, timeout=45).json()
+            if res.get("success"):
+                url = res["data"].get("image", {}).get("url") or res["data"].get("display_url") or res["data"].get("url")
+                print("  Uploaded:", url); return url
+            print(f"  imgbb failed (attempt {attempt}/{tries}):", res.get("error", res))
+            if res.get("status_code") in (400, 403) and "key" in str(res).lower():
+                print("  -> The IMGBB_KEY secret looks invalid. Check it at api.imgbb.com."); return None
+        except Exception as e:
+            print(f"  imgbb error (attempt {attempt}/{tries}):", e)
+        if attempt < tries: time.sleep(5 * attempt)
+    return None
 
-def post_to_instagram(uid, url, caption):
-    base="https://graph.instagram.com/v21.0"
-    c=requests.post(f"{base}/{uid}/media",data={"image_url":url,"caption":caption,"access_token":ACCESS_TOKEN}).json()
-    if "error" in c: print("  Error:",c["error"]["message"]); return False
-    time.sleep(5)
-    res=requests.post(f"{base}/{uid}/media_publish",data={"creation_id":c.get("id"),"access_token":ACCESS_TOKEN}).json()
-    if "error" in res: print("  Error:",res["error"]["message"]); return False
-    print("  Posted! ID:",res.get("id")); return True
+def _api_error(d):
+    e = d.get("error", {}); msg = e.get("message", d)
+    print("  Error:", msg)
+    if e.get("code") == 190 or "access token" in str(msg).lower():
+        print("  -> The Instagram token is invalid or expired. Generate a new one and update the IG_TOKEN secret.")
+
+def post_to_instagram(uid, url, caption, body=None):
+    base = "https://graph.instagram.com/v21.0"
+    # 1) create the media container (safe to retry - nothing is public yet)
+    cid = None
+    for attempt in range(1, 4):
+        try:
+            c = requests.post(f"{base}/{uid}/media", data={"image_url": url, "caption": caption, "media_type": "IMAGE",
+                              "access_token": ACCESS_TOKEN}, timeout=45).json()
+            if "error" in c:
+                _api_error(c)
+                if c["error"].get("code") == 190: return False
+            else:
+                cid = c.get("id"); break
+        except Exception as e:
+            print(f"  container error (attempt {attempt}/3):", e)
+        time.sleep(5 * attempt)
+    if not cid: return False
+    # 2) wait until Instagram has finished processing the image
+    for _ in range(12):
+        try:
+            st = requests.get(f"{base}/{cid}", params={"fields": "status_code", "access_token": ACCESS_TOKEN}, timeout=20).json().get("status_code")
+        except Exception: st = None
+        if st == "FINISHED": break
+        if st in ("ERROR", "EXPIRED"): print("  Instagram could not process the image:", st); return False
+        time.sleep(5)
+    # 3) publish. If the reply is lost, check the feed before retrying so we never double-post.
+    for attempt in range(1, 3):
+        try:
+            res = requests.post(f"{base}/{uid}/media_publish", data={"creation_id": cid, "access_token": ACCESS_TOKEN}, timeout=60).json()
+            if "error" in res:
+                _api_error(res); 
+                if res["error"].get("code") == 190: return False
+            else:
+                print("  Posted! ID:", res.get("id")); return True
+        except Exception as e:
+            print(f"  publish error (attempt {attempt}/2):", e)
+        time.sleep(10)
+        if body and already_posted(uid, body):
+            print("  The post is live (confirmed in feed)."); return True
+    return False
+
+def already_posted(uid, body):
+    """True if an identical post (same caption) went out in the last 20 hours."""
+    try:
+        r = requests.get(f"https://graph.instagram.com/v21.0/{uid}/media",
+                         params={"fields": "caption,timestamp", "limit": 25, "access_token": ACCESS_TOKEN},
+                         timeout=15).json()
+        norm = lambda c: (c or "").split(" — ", 1)[-1].strip()
+        from datetime import timezone, timedelta
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=20)
+        for m in r.get("data", []):
+            ts = datetime.strptime(m["timestamp"], "%Y-%m-%dT%H:%M:%S%z")
+            if ts >= cutoff and norm(m.get("caption")) == body.strip():
+                return True
+    except Exception as e:
+        print("  (duplicate check skipped:", e, ")")
+    return False
 
 def run_post(slot_dict, label):
     print(f"\n{'='*55}\n  IndiaByData — {label}\n  {now_ist().strftime('%A, %d %b %Y %H:%M IST')}\n{'='*55}")
-    uid = get_user_id()
-    if not uid: return False
+    dry = os.environ.get("DRY_RUN") == "1"
+    uid = None if dry else get_user_id()
+    if not dry and not uid: return False
     buf, caption = get_post(slot_dict, label)
+    if dry:
+        os.makedirs("previews", exist_ok=True)
+        buf.seek(0); p = f"previews/preview_{label.replace(' ','_')}.png"
+        open(p, "wb").write(buf.read())
+        print(f"  DRY RUN - nothing posted. Preview saved: {p}\n  Caption:\n{caption}"); return True
+    if os.environ.get("FORCE") != "1" and already_posted(uid, caption):
+        print("  Already posted in the last 20 hours - skipping to avoid a duplicate."); return True
     os.makedirs("previews",exist_ok=True)
     preview=f"previews/preview_{label.replace(' ','_')}.png"
     buf.seek(0)
@@ -325,7 +412,7 @@ def run_post(slot_dict, label):
     print(f"  Preview: {preview}"); buf.seek(0)
     url = upload_image(buf)
     if not url: return False
-    return post_to_instagram(uid, url, f"{now_ist().strftime('%d %b %Y')} — {caption}")
+    return post_to_instagram(uid, url, f"{now_ist().strftime('%d %b %Y')} — {caption}", body=caption)
 
 # ─── ENTRY POINT (GitHub Actions calls this) ──────────────
 SLOTS = {
