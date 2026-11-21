@@ -1,0 +1,34 @@
+{
+  "_about": "IndiaByData settings. Edit this file on GitHub to change what the trend radar compares and how carousels are split. Indicators come from the World Bank API (country IN).",
+
+  "trend": {
+    "min_year_gap": 2,
+    "min_growth_percent": 60,
+    "min_avg_daily_views": 1500,
+    "min_indicators_needed": 5
+  },
+
+  "carousel": {
+    "max_slides": 10,
+    "one_indicator_per_slide": true,
+    "summary_table": true,
+    "summary_max_rows": 8
+  },
+
+  "stories": { "enabled": true },
+
+  "indicators": [
+    {"key": "gdp",    "code": "NY.GDP.MKTP.CD",    "sector": "ECONOMY",       "label": "GDP",                       "kind": "usd",  "better": "up"},
+    {"key": "gdppc",  "code": "NY.GDP.PCAP.CD",    "sector": "INCOME",        "label": "GDP per person",            "kind": "usd",  "better": "up"},
+    {"key": "pop",    "code": "SP.POP.TOTL",       "sector": "POPULATION",    "label": "Population",                "kind": "pop",  "better": "neutral"},
+    {"key": "net",    "code": "IT.NET.USER.ZS",    "sector": "DIGITAL",       "label": "Internet users",            "kind": "pct",  "better": "up"},
+    {"key": "mob",    "code": "IT.CEL.SETS.P2",    "sector": "TELECOM",       "label": "Mobile plans per 100 people", "kind": "num", "better": "up"},
+    {"key": "life",   "code": "SP.DYN.LE00.IN",    "sector": "HEALTH",        "label": "Life expectancy",           "kind": "yrs",  "better": "up"},
+    {"key": "imr",    "code": "SP.DYN.IMRT.IN",    "sector": "CHILD HEALTH",  "label": "Infant deaths per 1,000 births", "kind": "num", "better": "down"},
+    {"key": "elec",   "code": "EG.ELC.ACCS.ZS",    "sector": "ENERGY",        "label": "People with electricity",   "kind": "pct",  "better": "up"},
+    {"key": "urban",  "code": "SP.URB.TOTL.IN.ZS", "sector": "CITIES",        "label": "Urban population",          "kind": "pct",  "better": "neutral"},
+    {"key": "agri",   "code": "NV.AGR.TOTL.ZS",    "sector": "AGRICULTURE",   "label": "Farming share of GDP",      "kind": "pct",  "better": "neutral"},
+    {"key": "school", "code": "SE.SEC.ENRR",       "sector": "EDUCATION",     "label": "Secondary school enrolment", "kind": "pct", "better": "up"},
+    {"key": "women",  "code": "SL.TLF.CACT.FE.ZS", "sector": "WOMEN AT WORK", "label": "Women in the labour force", "kind": "pct",  "better": "up"}
+  ]
+}

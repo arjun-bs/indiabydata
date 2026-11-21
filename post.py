@@ -19,24 +19,41 @@ def now_ist(): return datetime.now(ZoneInfo('Asia/Kolkata'))
 
 import sys; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import design_library as _dl
-from design_library import s7_chart, GREEN, RED, BLACK, BRAND, hc
+import trends
+from design_library import GREEN, RED, BLACK, BRAND, hc
 
 def s4_table(name, known, info):
+    if geo_slot():
+        gdp_pc = round(info['gdp'] * 1e12 / (info['pop'] * 1e6) / 1000)
+        return _s9(f"State spotlight: {name}", f"Rs. {info['gdp']}T", known,
+                   [(f"{info['pop']}M", "Population"), (f"{info['lit']}%", "Literacy"), (f"Rs. {gdp_pc}K", "GDP per capita")],
+                   "Source: Census, State Economic Survey", "tiles")
     if use_swiss():
         gdp_pc = round(info['gdp'] * 1e12 / (info['pop'] * 1e6) / 1000)
         items = [("State GDP (top 5 in India)", f"Rs. {info['gdp']}T"), ("Population", f"{info['pop']}M"),
                  ("Literacy (India avg 77.7%)", f"{info['lit']}%"), ("GDP per capita", f"Rs. {gdp_pc}K"),
                  ("Capital", info["capital"]), ("Known for", known),
                  ("Share of India GDP", f"{round(info['gdp']/160*100, 1)}%")]
-        return _dl.s12_grid(["STATE", name.upper()], "SPOTLIGHT", items, "Source: Census, State Economic Survey")
-    return _dl.s4_table(name, known, info)
+        return _mark("S12", _dl.s12_grid(["STATE", name.upper()], "SPOTLIGHT", items, "Source: Census, State Economic Survey", motif="tiles"))
+    return _mark("S4", _dl.s4_table(name, known, info))
 
 # Ranking charts must be in descending order (comparison charts keep India first on purpose)
 SORTED_CHARTS = ("India's Most Populated States", "India's Urbanisation by State")
 def s8_forbes(title, subtitle, bars, unit_label, source, bar_colors=None):
     if title in SORTED_CHARTS:
         bars = sorted(bars, key=lambda x: -x[1])
-    return _dl.s8_forbes(title, subtitle, bars, unit_label, source, bar_colors)
+    if geo_slot() and len(bars) >= 3:
+        u = str(unit_label).strip().lstrip("#").strip()
+        short = u if len(u) <= 3 else ""                       # long unit labels are descriptions, not suffixes
+        top = bars[0]
+        return _s9(title, f"{top[1]:g}{short}", f"{top[0]} - {u if not short else subtitle}",
+                   [(f"{v:g}{short}", n) for n, v in bars[1:4]], source)
+    return _mark("S8", _dl.s8_forbes(title, subtitle, bars, unit_label, source, bar_colors))
+
+def s7_chart(title1, title2, hero, hero_sub, hero_sent, bars, callout, stats2, source, accent="#7B5EA7"):
+    if geo_slot() and len(bars) >= 3:
+        return _s9(f"{title1} {title2}", hero, hero_sub, [(f"{v:g}", n) for n, v in bars[:3]], source)
+    return _mark("S7", _dl.s7_chart(title1, title2, hero, hero_sub, hero_sent, bars, callout, stats2, source, accent))
 
 # ─── SWISS LAYOUT MIX ─────────────────────────────────────
 # The same verified data is shown in the original layout (S1/S2/S3/S5/S6)
@@ -51,42 +68,82 @@ def use_swiss():
     if m in ("0", "1"): return m == "1"
     return (CURRENT_SLOT + now_ist().toordinal()) % 2 == 1
 
-def s1_white(title, hero, hero_sub, hero_sent, stats, source, accent="#D4A017"):
+def apply_theme(offset=0):
+    """Pick today's colour theme. The 4 posts of a day get 4 different colours; the set shifts every day.
+    THEME env: 'off' = original colours, a number = force that palette."""
+    m = os.environ.get("THEME", "auto")
+    if m == "off": return _dl.set_theme(None)
+    if m.isdigit(): return _dl.set_theme(int(m), int(m))
+    pal, acc = _dl.rotation(now_ist().toordinal() * 4 + CURRENT_SLOT + offset)
+    return _dl.set_theme(pal, acc)
+
+LAST_STYLE = ""
+
+def geo_slot():
+    """True when this post uses the geometric (S9) look. Guaranteed every day: the first Swiss slot always,
+    the second Swiss slot too on even days (so 1 or 2 geometric posts a day). GEO=1/0 forces on/off."""
+    m = os.environ.get("GEO", "auto")
+    if m in ("0", "1"): return m == "1"
+    if not use_swiss(): return False
+    o = now_ist().toordinal()
+    swiss = [s for s in range(4) if (s + o) % 2 == 1]
+    return CURRENT_SLOT == swiss[0] or (o % 2 == 0 and CURRENT_SLOT == swiss[1])
+
+def _s9(label, hero, sub, stats, source, motif=None):
+    global LAST_STYLE; LAST_STYLE = "S9"
+    return _dl.s9_geometric(str(label).upper(), str(hero), str(sub), GREEN, [(str(v), str(l)) for v, l in list(stats)[:3]], source, motif)
+
+def _mark(name, buf):
+    global LAST_STYLE; LAST_STYLE = name; return buf
+
+def s1_white(title, hero, hero_sub, hero_sent, stats, source, accent="#D4A017", kicker="INDIA'S"):
     if use_swiss():
-        return _dl.s9_geometric(title.upper(), hero, hero_sub, hc(hero_sent), list(stats)[:3], source)
-    return _dl.s1_white(title, hero, hero_sub, hero_sent, stats, source, accent)
+        label = title.upper() if kicker == "INDIA'S" else f"{kicker}: {title}".upper()
+        return _s9(label, hero, hero_sub, stats, source)
+    return _mark("S1", _dl.s1_white(title, hero, hero_sub, hero_sent, stats, source, accent, kicker))
 
 def s2_bold(headline, number, hero_sent, number_unit, sub, stats3, note, source):
+    if geo_slot():
+        u = str(number_unit).strip()
+        return _s9(headline, str(number) + (u if len(u) <= 3 else ""), sub if len(u) <= 3 else f"{u} - {sub}", stats3, source)
     if use_swiss():
         col = {"green": GREEN, "red": RED}.get(hero_sent, BLACK)
         big = str(number) + (number_unit if len(str(number_unit).strip()) <= 3 else "")
         attached = big != str(number)
         sub_r = sub if attached else f"{number} {str(number_unit).lower()} - {sub}"
-        return _dl.s13_bignum("#FFC107", col, big, headline, sub_r,
+        return _mark("S13", _dl.s13_bignum(_dl._th("mid", "#FFC107"), col, big, headline, sub_r,
                               [(l, v) for v, l in stats3][:3],
-                              [("Takeaway", note)], source)
-    return _dl.s2_bold(headline, number, hero_sent, number_unit, sub, stats3, note, source)
+                              [("Takeaway", note)], source))
+    return _mark("S2", _dl.s2_bold(headline, number, hero_sent, number_unit, sub, stats3, note, source))
 
 def s3_vibrant(title_top, title_bot, hero_val, hero_sent, cards3, source):
+    if geo_slot():
+        return _s9(f"{title_top} {title_bot}", hero_val, "", cards3, source)
     if use_swiss():
         items = [("Headline stat", hero_val)] + [(l, v) for v, l in cards3]
-        return _dl.s12_grid([title_top, title_bot], str(now_ist().year), items[:4], source)
-    return _dl.s3_vibrant(title_top, title_bot, hero_val, hero_sent, cards3, source)
+        return _mark("S12", _dl.s12_grid([title_top, title_bot], str(now_ist().year), items[:4], source))
+    return _mark("S3", _dl.s3_vibrant(title_top, title_bot, hero_val, hero_sent, cards3, source))
 
 def s5_editorial(title1, title2, hero, hero_sub, hero_sent, cards4, source):
+    if geo_slot():
+        return _s9(f"{title1} {title2}", hero, hero_sub, cards4, source)
     if use_swiss():
-        return _dl.s11_colorblock(BRAND, title1, title2, f"{hero} - {hero_sub}",
-                                  "Data: " + source.replace("Source: ", ""), list(cards4)[:4], source)
-    return _dl.s5_editorial(title1, title2, hero, hero_sub, hero_sent, cards4, source)
+        return _mark("S11", _dl.s11_colorblock(_dl._th("bold", BRAND), title1, title2, f"{hero} - {hero_sub}",
+                                  "Data: " + source.replace("Source: ", ""), list(cards4)[:4], source))
+    return _mark("S5", _dl.s5_editorial(title1, title2, hero, hero_sub, hero_sent, cards4, source))
 
 def s6_numbers(title1, title2, year, hero_num, hero_unit, hero_label, hero_sent, items3, source, accent=GREEN):
+    if geo_slot():
+        u = str(hero_unit).strip()
+        big = str(hero_num) + (u if u and len(u) <= 3 and not u.isalpha() else "")
+        return _s9(f"{title1} {title2} {year}".strip(), big, hero_label, [(f"{n} {uu}".strip(), l) for n, uu, l in items3], source)
     if use_swiss():
-        more = " | ".join(f"{n} {u} {l}".replace("  ", " ") for n, u, l in items3)
-        blocks = [(f"{title2.title()} {year}".strip(), f"{hero_num} {hero_unit} - {hero_label}".replace("  ", " ")),
-                  ("By the numbers", more)]
-        big = str(hero_num) + (hero_unit if hero_unit and len(hero_unit.strip()) <= 3 and not hero_unit.strip().isalpha() else "")
-        return _dl.s10_oversized(big, blocks, [hc(hero_sent), "#2196F3", "#8BC34A"], source)
-    return _dl.s6_numbers(title1, title2, year, hero_num, hero_unit, hero_label, hero_sent, items3, source, accent)
+        unit = str(hero_unit).strip()
+        big = str(hero_num) + (unit if unit and len(unit) <= 3 and not unit.isalpha() else "")
+        title_bot = f"{title2.title()} {year}".strip().upper() if False else f"{title2} {year}".strip()
+        cards = [(f"{n} {u}".replace("  ", " ").strip(), l) for n, u, l in items3][:3]
+        return _mark("S3", _dl.s3_vibrant(title1, title_bot, big, hero_sent, cards, source))
+    return _mark("S6", _dl.s6_numbers(title1, title2, year, hero_num, hero_unit, hero_label, hero_sent, items3, source, accent))
 
 import os, sys
 def _need(name):
@@ -302,7 +359,7 @@ def get_post(slot_dict, label):
         key = (0, day % 7)
     global CURRENT_SLOT
     CURRENT_SLOT = _SLOT_IDX.get(label[:3], 0)
-    print(f"  {label} | Week {wk} | Day {day} | theme: {'Swiss' if use_swiss() else 'classic'}")
+    print(f"  {label} | Week {wk} | Day {day} | layout: {'Swiss' if use_swiss() else 'classic'} | colour: {apply_theme()}")
     return slot_dict[key]()
 
 # ─── INSTAGRAM ────────────────────────────────────────────
@@ -334,46 +391,113 @@ def _api_error(d):
     if e.get("code") == 190 or "access token" in str(msg).lower():
         print("  -> The Instagram token is invalid or expired. Generate a new one and update the IG_TOKEN secret.")
 
-def post_to_instagram(uid, url, caption, body=None):
-    base = "https://graph.instagram.com/v21.0"
-    # 1) create the media container (safe to retry - nothing is public yet)
-    cid = None
+BASE = "https://graph.instagram.com/v21.0"
+
+def _create_container(uid, data):
+    """Create a media container (image, carousel item, carousel or story). Safe to retry: nothing is public yet."""
     for attempt in range(1, 4):
         try:
-            c = requests.post(f"{base}/{uid}/media", data={"image_url": url, "caption": caption, "media_type": "IMAGE",
-                              "access_token": ACCESS_TOKEN}, timeout=45).json()
+            c = requests.post(f"{BASE}/{uid}/media", data={**data, "access_token": ACCESS_TOKEN}, timeout=45).json()
             if "error" in c:
                 _api_error(c)
-                if c["error"].get("code") == 190: return False
+                if c["error"].get("code") == 190: return None
             else:
-                cid = c.get("id"); break
+                return c.get("id")
         except Exception as e:
             print(f"  container error (attempt {attempt}/3):", e)
         time.sleep(5 * attempt)
-    if not cid: return False
-    # 2) wait until Instagram has finished processing the image
-    for _ in range(12):
+    return None
+
+def _wait_ready(cid, tries=12):
+    for _ in range(tries):
         try:
-            st = requests.get(f"{base}/{cid}", params={"fields": "status_code", "access_token": ACCESS_TOKEN}, timeout=20).json().get("status_code")
-        except Exception: st = None
-        if st == "FINISHED": break
-        if st in ("ERROR", "EXPIRED"): print("  Instagram could not process the image:", st); return False
+            st = requests.get(f"{BASE}/{cid}", params={"fields": "status_code", "access_token": ACCESS_TOKEN}, timeout=20).json().get("status_code")
+        except Exception:
+            st = None
+        if st == "FINISHED": return True
+        if st in ("ERROR", "EXPIRED"):
+            print("  Instagram could not process the media:", st); return False
         time.sleep(5)
-    # 3) publish. If the reply is lost, check the feed before retrying so we never double-post.
+    return True   # not confirmed - try anyway
+
+def _publish(uid, cid, body=None):
+    """Publish a container. If the reply is lost, check the feed before retrying so we never double-post."""
     for attempt in range(1, 3):
         try:
-            res = requests.post(f"{base}/{uid}/media_publish", data={"creation_id": cid, "access_token": ACCESS_TOKEN}, timeout=60).json()
+            res = requests.post(f"{BASE}/{uid}/media_publish", data={"creation_id": cid, "access_token": ACCESS_TOKEN}, timeout=60).json()
             if "error" in res:
-                _api_error(res); 
-                if res["error"].get("code") == 190: return False
+                _api_error(res)
+                if res["error"].get("code") == 190: return None
             else:
-                print("  Posted! ID:", res.get("id")); return True
+                print("  Posted! ID:", res.get("id")); return res.get("id")
         except Exception as e:
             print(f"  publish error (attempt {attempt}/2):", e)
         time.sleep(10)
         if body and already_posted(uid, body):
-            print("  The post is live (confirmed in feed)."); return True
-    return False
+            print("  The post is live (confirmed in feed)."); return "confirmed"
+    return None
+
+def post_to_instagram(uid, url, caption, body=None):
+    cid = _create_container(uid, {"image_url": url, "caption": caption, "media_type": "IMAGE"})
+    if not cid or not _wait_ready(cid): return False
+    return bool(_publish(uid, cid, body))
+
+def post_carousel(uid, urls, caption, body=None):
+    kids = []
+    for u in urls:
+        k = _create_container(uid, {"image_url": u, "is_carousel_item": "true"})
+        if not k: return False
+        kids.append(k)
+    if not all(_wait_ready(k) for k in kids): return False
+    cid = _create_container(uid, {"media_type": "CAROUSEL", "children": ",".join(kids), "caption": caption})
+    if not cid or not _wait_ready(cid): return False
+    return bool(_publish(uid, cid, body))
+
+def post_story(uid, url):
+    cid = _create_container(uid, {"image_url": url, "media_type": "STORIES"})
+    if not cid or not _wait_ready(cid): return False
+    return bool(_publish(uid, cid))
+
+def jpeg(buf, q=92):
+    """Carousel items and stories are sent as JPEG (the format the API officially accepts)."""
+    from PIL import Image
+    buf.seek(0); out = io.BytesIO()
+    Image.open(buf).convert("RGB").save(out, format="JPEG", quality=q); out.seek(0); return out
+
+# Looks cycled across the slides of one carousel so no two neighbours match (style AND colour).
+# (colours come from design_library.PALETTES via apply_theme)
+
+def varied_slide(kw, i):
+    """One indicator slide from trends.india_args kwargs. Look number i rotates layout AND colour theme."""
+    (then_v, then_l), (now_v, now_l), (chg_v, _c) = kw["stats"]
+    sector = kw["hero_sub"].split(",")[0].upper()
+    src = kw["source"]; label = kw["title"]
+    apply_theme(offset=i * 7) if os.environ.get("THEME", "auto") != "off" else _dl.set_theme(None)
+    k = (i + now_ist().toordinal()) % 4          # starting layout also shifts each day
+    if k == 0:
+        return _dl.s9_geometric(f"{kw['kicker']}: {label}".upper(), kw["hero"], kw["hero_sub"], hc(kw["hero_sent"]), kw["stats"], src)
+    if k == 1:
+        return _dl.s11_colorblock(_dl._th("bold", BRAND), sector, now_v,
+                                  f"{label}. {then_l.title()}: {then_v}.", f"{now_l.title()}: {now_v}. Change: {chg_v}.",
+                                  [(then_v, then_l), (now_v, now_l), (chg_v, "CHANGE")], src)
+    if k == 2:
+        return _dl.s13_bignum(_dl._th("mid", "#FFC107"), hc(kw["hero_sent"]), now_v, sector, label,
+                              [(then_l, then_v), ("CHANGE", chg_v)], [(now_l, now_v)], src)
+    return _dl.s1_white(kw["title"], kw["hero"], kw["hero_sub"], kw["hero_sent"], kw["stats"], src, kicker=kw["kicker"])
+
+def story_image(buf):
+    """9:16 story: the poster centred on a canvas in the poster's own background colour (inside Instagram's safe zones)."""
+    from PIL import Image, ImageDraw
+    buf.seek(0); poster = Image.open(buf).convert("RGB")
+    W, H = poster.size
+    bg = poster.getpixel((W - 8, H // 2))
+    canvas = Image.new("RGB", (1080, 1920), bg)
+    canvas.paste(poster, ((1080 - W) // 2, (1920 - H) // 2))
+    lum = 0.299 * bg[0] + 0.587 * bg[1] + 0.114 * bg[2]
+    d = ImageDraw.Draw(canvas)
+    d.text((90, 1730), "NEW POST ON THE FEED", font=_dl.get_font(30), fill=(20, 20, 20) if lum > 140 else (235, 235, 235))
+    d.text((90, 1775), "@indiabydata", font=_dl.get_font(26, bold=False), fill=(90, 90, 90) if lum > 140 else (170, 170, 170))
+    out = io.BytesIO(); canvas.save(out, format="JPEG", quality=92); out.seek(0); return out
 
 def already_posted(uid, body):
     """True if an identical post (same caption) went out in the last 20 hours."""
@@ -392,27 +516,88 @@ def already_posted(uid, body):
         print("  (duplicate check skipped:", e, ")")
     return False
 
+def recent_captions(uid, n=25):
+    try:
+        r = requests.get(f"https://graph.instagram.com/v21.0/{uid}/media",
+                         params={"fields": "caption", "limit": n, "access_token": ACCESS_TOKEN}, timeout=15).json()
+        return [m.get("caption") or "" for m in r.get("data", [])]
+    except Exception:
+        return []
+
+def trend_post(uid):
+    """Trend-radar post for the 6 PM slot. Returns ([poster buffers], caption) or None.
+    One poster, or a 3-slide carousel when there is an India then-vs-now story to tell.
+    TREND_MODE: auto (default) = post it | draft = render a preview only | off = disabled."""
+    global CURRENT_SLOT
+    mode = os.environ.get("TREND_MODE", "auto")
+    if mode == "off": return None
+    try:
+        t = trends.find_trend(recent_captions(uid) if uid else [])
+        if not t: return None
+        title, hero, hero_sub, stats, source, caption = trends.poster_args(t)
+        CURRENT_SLOT = 2
+        apply_theme()
+        bufs = [s1_white(title, hero, hero_sub, "green", stats, source, kicker="TRENDING IN INDIA")]
+        extra = trends.india_args(t)
+        if extra:
+            slides, table, text = extra
+            for n, kw in enumerate(slides, 1):
+                bufs.append(varied_slide(kw, n))
+            if table:
+                bufs.append(_dl.s12_grid(table["words"], table["tag"], table["items"], table["source"]))
+            body, tags = caption.rsplit("\n\n", 1)
+            caption = body + "\n\n" + text + "\n\n" + tags
+        os.makedirs("previews", exist_ok=True)
+        for n, b in enumerate(bufs, 1):
+            b.seek(0); open(f"previews/trend_slide{n}.png", "wb").write(b.read()); b.seek(0)
+        open("previews/trend_caption.txt", "w").write(caption)
+        if mode == "draft":
+            print("  TREND_MODE=draft: trend post saved to previews/, not posted. Caption:\n" + caption)
+            return None
+        return bufs, caption
+    except Exception as e:
+        print("  Trend radar error (falling back to the normal post):", e)
+        return None
+
 def run_post(slot_dict, label):
     print(f"\n{'='*55}\n  IndiaByData — {label}\n  {now_ist().strftime('%A, %d %b %Y %H:%M IST')}\n{'='*55}")
     dry = os.environ.get("DRY_RUN") == "1"
     uid = None if dry else get_user_id()
     if not dry and not uid: return False
-    buf, caption = get_post(slot_dict, label)
+    tp = trend_post(uid) if label.startswith("6PM") else None
+    if tp:
+        bufs, caption = tp
+    else:
+        b, caption = get_post(slot_dict, label); bufs = [b]
+    os.makedirs("previews", exist_ok=True)
+    stories_on = os.environ.get("STORIES", "on" if trends.CFG["stories"].get("enabled", True) else "off") != "off"
+    for n, b in enumerate(bufs, 1):
+        b.seek(0); open(f"previews/preview_{label.replace(' ','_')}_{n}.png", "wb").write(b.read()); b.seek(0)
     if dry:
-        os.makedirs("previews", exist_ok=True)
-        buf.seek(0); p = f"previews/preview_{label.replace(' ','_')}.png"
-        open(p, "wb").write(buf.read())
-        print(f"  DRY RUN - nothing posted. Preview saved: {p}\n  Caption:\n{caption}"); return True
+        if stories_on: open("previews/story_preview.jpg", "wb").write(story_image(bufs[0]).read())
+        kind = f"carousel of {len(bufs)}" if len(bufs) > 1 else "single image"
+        print(f"  DRY RUN - nothing posted ({kind}). Previews saved in previews/\n  Caption:\n{caption}"); return True
     if os.environ.get("FORCE") != "1" and already_posted(uid, caption):
         print("  Already posted in the last 20 hours - skipping to avoid a duplicate."); return True
-    os.makedirs("previews",exist_ok=True)
-    preview=f"previews/preview_{label.replace(' ','_')}.png"
-    buf.seek(0)
-    with open(preview,"wb") as fh: fh.write(buf.read())
-    print(f"  Preview: {preview}"); buf.seek(0)
-    url = upload_image(buf)
-    if not url: return False
-    return post_to_instagram(uid, url, f"{now_ist().strftime('%d %b %Y')} — {caption}", body=caption)
+    full_caption = f"{now_ist().strftime('%d %b %Y')} — {caption}"
+    ok = False
+    if len(bufs) > 1:
+        urls = [upload_image(jpeg(b)) for b in bufs]
+        if all(urls):
+            ok = post_carousel(uid, urls, full_caption, body=caption)
+        else:
+            print("  Carousel upload failed - posting the cover image alone.")
+            u = upload_image(bufs[0]); ok = bool(u) and post_to_instagram(uid, u, full_caption, body=caption)
+    else:
+        u = upload_image(bufs[0]); ok = bool(u) and post_to_instagram(uid, u, full_caption, body=caption)
+    if ok and stories_on:
+        try:
+            time.sleep(5)
+            su = upload_image(story_image(bufs[0]))
+            print("  Story posted." if su and post_story(uid, su) else "  (Story could not be posted - the feed post is live.)")
+        except Exception as e:
+            print("  (Story skipped:", e, ")")
+    return ok
 
 # ─── ENTRY POINT (GitHub Actions calls this) ──────────────
 SLOTS = {
